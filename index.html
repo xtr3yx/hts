@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalendarz Miesięczny - Daily Plan</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .weekdays div {
+      padding: 8px 0;
+      background-color: #333;
+      border: 1px solid #444;
+      border-radius: 8px;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+    }
+    .day {
+      background-color: #2a2a2a;
+      border: 2px solid #666;
+      padding: 6px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease;
+    }
+    .day:hover {
+      transform: scale(1.02);
+      border-color: #888;
+    }
+    .day-header {
+      font-weight: bold;
+      font-size: 14px;
+      text-align: right;
+      margin-bottom: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #555;
+      padding: 2px 4px;
+      text-align: center;
+    }
+    .done {
+      background-color: #4caf50;
+      color: white;
+    }
+    .not-done {
+      background-color: #f44336;
+      color: white;
+    }
+    button {
+      border: none;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .chart-wrapper {
+      margin-top: 40px;
+      background-color: #2a2a2a;
+      border-radius: 10px;
+      padding: 10px;
+      width: 100%;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .chart-wrapper h2 {
+      text-align: center;
+    }
+    .top-link {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .top-link a {
+      background-color: #444;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="top-link">
+  <a href="statystyki.html">📊 Statystyki miesięczne</a>
+</div>
+
+<h1 id="monthLabel"></h1>
+<div class="controls">
+  <button onclick="changeMonth(-1)">&lt; Poprzedni</button>
+  <button onclick="changeMonth(1)">Następny &gt;</button>
+</div>
+<div class="weekdays">
+  <div>Poniedziałek</div>
+  <div>Wtorek</div>
+  <div>Środa</div>
+  <div>Czwartek</div>
+  <div>Piątek</div>
+  <div>Sobota</div>
+  <div>Niedziela</div>
+</div>
+<div class="calendar" id="calendar"></div>
+<div id="chartsContainer"></div>
+
+<script>
+  const tasksTemplate = [
+    { name: "Session Breakout", time: "8:00-16:00" },
+    { name: "Pre market breakout", time: "8:00-8:59" },
+    { name: "DAX m15 breakout", time: "9:30" },
+    { name: "UK100 m15 breakout", time: "9:30" },
+    { name: "DAX H1", time: "10:00" },
+    { name: "UK100 H1", time: "10:00" },
+    { name: "GBPUSD H4", time: "11:00" },
+    { name: "US30 H1", time: "14:30-15:29" },
+    { name: "US100 H1", time: "14:30-15:29" },
+    { name: "US30 m15 breakout", time: "15:30" },
+    { name: "GBPUSD FS100", time: "23:00" },
+    { name: "HTS cross m1-m5", time: "-" },
+    { name: "H4 trading class", time: "-" },
+    { name: "Gap Hunting", time: "-" }
+  ];
+
+  const calendar = document.getElementById("calendar");
+  const monthLabel = document.getElementById("monthLabel");
+  let currentDate = new Date();
+
+  function renderCalendar(year, month) {
+  calendar.innerHTML = "";
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startWeekDay = (firstDay.getDay() + 6) % 7;
+
+  monthLabel.textContent = `${firstDay.toLocaleString('pl-PL', { month: 'long' })} ${year}`;
+  const totalBoxes = Math.ceil((startWeekDay + daysInMonth) / 7) * 7;
+
+  for (let i = 0; i < totalBoxes; i++) {
+    const day = i - startWeekDay + 1;
+    if (i < startWeekDay || day > daysInMonth) {
+      const emptyCell = document.createElement("div");
+      calendar.appendChild(emptyCell);
+    } else {
+      const fullDate = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      const storageKey = `daily-plan-${fullDate}`;
+      let saved = JSON.parse(localStorage.getItem(storageKey)) || tasksTemplate.map(task => ({ ...task, done: null }));
+
+      const dayDiv = document.createElement("div");
+      dayDiv.className = "day";
+
+      const header = document.createElement("div");
+      header.className = "day-header";
+      header.textContent = `${day}`;
+      dayDiv.appendChild(header);
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      thead.innerHTML = `<tr><th>Zagranie</th><th>Godzina</th><th>✓</th></tr>`;
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      saved.forEach((task, index) => {
+        const row = document.createElement("tr");
+
+        const nameCell = document.createElement("td");
+        nameCell.textContent = task.name;
+        row.appendChild(nameCell);
+
+        const timeCell = document.createElement("td");
+        timeCell.textContent = task.time;
+        row.appendChild(timeCell);
+
+        const statusCell = document.createElement("td");
+        const btn = document.createElement("button");
+
+        if (task.done === true) {
+          btn.textContent = "Tak";
+          btn.className = "done";
+        } else if (task.done === false) {
+          btn.textContent = "Nie";
+          btn.className = "not-done";
+        } else {
+          btn.textContent = "?";
+          btn.className = "";
+          btn.style.backgroundColor = "#888";
+          btn.style.color = "#fff";
+        }
+
+        btn.onclick = () => {
+          if (saved[index].done === null) saved[index].done = true;
+          else if (saved[index].done === true) saved[index].done = false;
+          else saved[index].done = null;
+
+          localStorage.setItem(storageKey, JSON.stringify(saved));
+          renderCalendar(year, month);
+        };
+
+        statusCell.appendChild(btn);
+        row.appendChild(statusCell);
+        tbody.appendChild(row);
+      });
+
+      table.appendChild(tbody);
+      dayDiv.appendChild(table);
+      calendar.appendChild(dayDiv);
+    }
+  }
+
+  // Liczenie statystyk
+  const stats = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    const fullDate = `${year}-${(month + 1).toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+    const storageKey = `daily-plan-${fullDate}`;
+    const savedDay = JSON.parse(localStorage.getItem(storageKey));
+    if (savedDay) {
+      savedDay.forEach(task => {
+        if (!stats[task.name]) {
+          stats[task.name] = { done: 0, notDone: 0 };
+        }
+        if (task.done === true) {
+          stats[task.name].done += 1;
+        } else if (task.done === false) {
+          stats[task.name].notDone += 1;
+        }
+      });
+    }
+  }
+
+  updateChart(stats, year, month);
+}
+
+  function changeMonth(offset) {
+    currentDate.setMonth(currentDate.getMonth() + offset);
+    renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+  }
+
+  function updateChart(data, year, month) {
+  const container = document.getElementById('chartsContainer');
+  container.innerHTML = '';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chart-wrapper';
+
+  const title = document.createElement('h2');
+  title.textContent = `Statystyka: ${new Date(year, month).toLocaleString('pl-PL', { month: 'long', year: 'numeric' })}`;
+  wrapper.appendChild(title);
+
+  const canvas = document.createElement('canvas');
+  wrapper.appendChild(canvas);
+  container.appendChild(wrapper);
+
+  const ctx = canvas.getContext('2d');
+
+  // Rozdzielone dane
+  const filtered = Object.entries(data).filter(
+  ([_, value]) => (value.done || 0) > 0 || (value.notDone || 0) > 0
+);
+
+const labels = filtered.map(([key]) => key);
+const doneCounts = filtered.map(([_, val]) => val.done || 0);
+const notDoneCounts = filtered.map(([_, val]) => val.notDone || 0);
+const netCounts = filtered.map((_, i) => doneCounts[i] - notDoneCounts[i]);
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Zagranie: pomyślne - niepomyślne',
+        data: netCounts,
+        backgroundColor: 'rgba(76, 175, 80, 0.7)',
+        borderColor: 'rgba(76, 175, 80, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            color: '#f0f0f0',
+            stepSize: 1,
+            precision: 0
+          },
+          grid: { color: '#444' }
+        },
+        y: {
+          ticks: { color: '#f0f0f0' },
+          grid: { color: '#444' }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const i = context.dataIndex;
+              const done = doneCounts[i];
+              const notDone = notDoneCounts[i];
+              const result = netCounts[i];
+              return [
+                `✅ Pomyślne: ${done}`,
+                `❌ Niepomyślne: ${notDone}`,
+                `📊 Suma: ${result}`
+              ];
+            }
+          }
+        },
+        legend: {
+          labels: { color: '#f0f0f0' }
+        }
+      }
+    }
+  });
+}
+
+
+  renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+</script>
+
+</body>
+</html>
