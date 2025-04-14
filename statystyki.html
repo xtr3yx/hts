@@ -116,6 +116,60 @@ function populateFilters(stats) {
   monthSelect.onchange = applyFilter;
 }
 
+function ensureNonZeroBar(value) {
+  return Math.abs(value) < 0.5 ? 0.01* Math.sign(value || 1) : value;
+}
+
+function renderChart(canvas, labels, doneCounts, notDoneCounts, netCounts, titleText, colorBg, colorBorder) {
+  const ctx = canvas.getContext("2d");
+
+  new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: titleText,
+        data: netCounts.map(ensureNonZeroBar),
+        backgroundColor: colorBg,
+        borderColor: colorBorder,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const i = context.dataIndex;
+              return [
+                `✅ Pomyślne: ${doneCounts[i]}`,
+                `❌ Niepomyślne: ${notDoneCounts[i]}`,
+                `📊 Suma: ${netCounts[i]}`
+              ];
+            }
+          }
+        },
+        legend: {
+          labels: { color: '#f0f0f0' }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { color: '#f0f0f0', stepSize: 1, precision: 0 },
+          grid: { color: '#444' }
+        },
+        y: {
+          ticks: { color: '#f0f0f0' },
+          grid: { color: '#444' }
+        }
+      }
+    }
+  });
+}
+
 function renderOverallSummary(statsByMonth) {
   const totalStats = {};
 
@@ -149,53 +203,8 @@ function renderOverallSummary(statsByMonth) {
   wrapper.appendChild(canvas);
   container.appendChild(wrapper);
 
-  const ctx = canvas.getContext("2d");
-
-  new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: "Suma zagrań (✓ - ✗)",
-        data: netCounts,
-        backgroundColor: 'rgba(255, 193, 7, 0.7)',
-        borderColor: 'rgba(255, 193, 7, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      indexAxis: 'y',
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: (context) => {
-              const i = context.dataIndex;
-              return [
-                `✅ Pomyślne: ${doneCounts[i]}`,
-                `❌ Niepomyślne: ${notDoneCounts[i]}`,
-                `📊 Suma: ${netCounts[i]}`
-              ];
-            }
-          }
-        },
-        legend: {
-          labels: { color: '#f0f0f0' }
-        }
-      },
-      scales: {
-        x: {
-          beginAtZero: true,
-          ticks: { color: '#f0f0f0', stepSize: 1, precision: 0 },
-          grid: { color: '#444' }
-        },
-        y: {
-          ticks: { color: '#f0f0f0' },
-          grid: { color: '#444' }
-        }
-      }
-    }
-  });
+  renderChart(canvas, labels, doneCounts, notDoneCounts, netCounts,
+    "Suma zagrań (✓ - ✗)", 'rgba(255, 193, 7, 0.7)', 'rgba(255, 193, 7, 1)');
 }
 
 function renderCharts(statsByMonth, filter = null) {
@@ -227,53 +236,8 @@ function renderCharts(statsByMonth, filter = null) {
     wrapper.appendChild(canvas);
     container.appendChild(wrapper);
 
-    const ctx = canvas.getContext("2d");
-
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: labels,
-        datasets: [{
-            label: 'Zagranie: pomyślne - niepomyślne',
-            data: netCounts,
-          backgroundColor: 'rgba(76, 175, 80, 0.7)',
-          borderColor: 'rgba(76, 175, 80, 1)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        indexAxis: 'y',
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const i = context.dataIndex;
-                return [
-                `✅ Pomyślne: ${done}`,
-                `❌ Niepomyślne: ${notDone}`,
-                `📊 Suma: ${result}`
-                ];
-              }
-            }
-          },
-          legend: {
-            labels: { color: '#f0f0f0' }
-          }
-        },
-        scales: {
-          x: {
-            beginAtZero: true,
-            ticks: { color: '#f0f0f0', stepSize: 1, precision: 0 },
-            grid: { color: '#444' }
-          },
-          y: {
-            ticks: { color: '#f0f0f0' },
-            grid: { color: '#444' }
-          }
-        }
-      }
-    });
+    renderChart(canvas, labels, doneCounts, notDoneCounts, netCounts,
+      "Zagranie: pomyślne - niepomyślne", 'rgba(76, 175, 80, 0.7)', 'rgba(76, 175, 80, 1)');
   });
 }
 
@@ -294,8 +258,6 @@ function resetFilter() {
 
 let allStats = getAllStats();
 populateFilters(allStats);
-
-// Domyślnie pokaż wszystko
 resetFilter();
 </script>
 
