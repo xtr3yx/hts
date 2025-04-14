@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Statystyki miesięczne</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .chart-wrapper {
+      background-color: #2a2a2a;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 20px auto;
+      max-width: 900px;
+    }
+    canvas {
+      width: 100%;
+    }
+    a {
+      display: inline-block;
+      color: #4caf50;
+      margin-bottom: 20px;
+      text-decoration: none;
+    }
+    .filters {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    select, button {
+      background-color: #333;
+      color: #f0f0f0;
+      border: 1px solid #666;
+      border-radius: 5px;
+      padding: 5px 10px;
+      margin: 5px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<a href="index.html">← Powrót do kalendarza</a>
+<h1>Statystyki miesięczne 📊</h1>
+
+<div class="filters">
+  <select id="monthSelect"></select>
+  <select id="yearSelect"></select>
+  <button onclick="resetFilter()">Pokaż wszystko</button>
+</div>
+
+<div id="allCharts"></div>
+
+<script>
+function getAllStats() {
+  const statsByMonth = {};
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith("daily-plan-")) {
+      const [_, dateStr] = key.split("daily-plan-");
+      const [year, month] = dateStr.split("-");
+
+      const monthKey = `${year}-${month}`;
+      const data = JSON.parse(localStorage.getItem(key));
+      if (!statsByMonth[monthKey]) statsByMonth[monthKey] = {};
+
+      data.forEach(task => {
+        if (!statsByMonth[monthKey][task.name])
+          statsByMonth[monthKey][task.name] = { done: 0, notDone: 0 };
+
+        if (task.done === true)
+          statsByMonth[monthKey][task.name].done += 1;
+        else if (task.done === false)
+          statsByMonth[monthKey][task.name].notDone += 1;
+      });
+    }
+  }
+
+  return statsByMonth;
+}
+
+function populateFilters(stats) {
+  const yearSelect = document.getElementById("yearSelect");
+  const monthSelect = document.getElementById("monthSelect");
+
+  const keys = Object.keys(stats);
+  const years = [...new Set(keys.map(k => k.split("-")[0]))];
+  const months = [...new Set(keys.map(k => k.split("-")[1]))];
+
+  yearSelect.innerHTML = '';
+  monthSelect.innerHTML = '';
+
+  years.sort().forEach(y => {
+    const option = document.createElement("option");
+    option.value = y;
+    option.textContent = y;
+    yearSelect.appendChild(option);
+  });
+
+  months.sort().forEach(m => {
+    const option = document.createElement("option");
+    option.value = m;
+    option.textContent = new Date(0, m - 1).toLocaleString('pl-PL', { month: 'long' });
+    monthSelect.appendChild(option);
+  });
+
+  yearSelect.onchange = applyFilter;
+  monthSelect.onchange = applyFilter;
+}
+
+function ensureNonZeroBar(value) {
+  return Math.abs(value) < 0.5 ? 0.01* Math.sign(value || 1) : value;
+}
+
+function renderChart(canvas, labels, doneCounts, notDoneCounts, netCounts, titleText, colorBg, colorBorder) {
+  const ctx = canvas.getContext("2d");
+
+  new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: titleText,
+        data: netCounts.map(ensureNonZeroBar),
+        backgroundColor: colorBg,
+        borderColor: colorBorder,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const i = context.dataIndex;
+              return [
+                `✅ Pomyślne: ${doneCounts[i]}`,
+                `❌ Niepomyślne: ${notDoneCounts[i]}`,
+                `📊 Suma: ${netCounts[i]}`
+              ];
+            }
+          }
+        },
+        legend: {
+          labels: { color: '#f0f0f0' }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { color: '#f0f0f0', stepSize: 1, precision: 0 },
+          grid: { color: '#444' }
+        },
+        y: {
+          ticks: { color: '#f0f0f0' },
+          grid: { color: '#444' }
+        }
+      }
+    }
+  });
+}
+
+function renderOverallSummary(statsByMonth) {
+  const totalStats = {};
+
+  for (const month in statsByMonth) {
+    const monthData = statsByMonth[month];
+    for (const task in monthData) {
+      if (!totalStats[task]) totalStats[task] = { done: 0, notDone: 0 };
+      totalStats[task].done += monthData[task].done || 0;
+      totalStats[task].notDone += monthData[task].notDone || 0;
+    }
+  }
+
+  const filtered = Object.entries(totalStats).filter(
+    ([_, val]) => (val.done || 0) > 0 || (val.notDone || 0) > 0
+  );
+
+  const labels = filtered.map(([key]) => key);
+  const doneCounts = filtered.map(([_, val]) => val.done || 0);
+  const notDoneCounts = filtered.map(([_, val]) => val.notDone || 0);
+  const netCounts = doneCounts.map((v, i) => v - notDoneCounts[i]);
+
+  const container = document.getElementById("allCharts");
+  const wrapper = document.createElement("div");
+  wrapper.className = "chart-wrapper";
+
+  const title = document.createElement("h2");
+  title.textContent = "Podsumowanie ogólne ze wszystkich miesięcy";
+  wrapper.appendChild(title);
+
+  const canvas = document.createElement("canvas");
+  wrapper.appendChild(canvas);
+  container.appendChild(wrapper);
+
+  renderChart(canvas, labels, doneCounts, notDoneCounts, netCounts,
+    "Suma zagrań (✓ - ✗)", 'rgba(255, 193, 7, 0.7)', 'rgba(255, 193, 7, 1)');
+}
+
+function renderCharts(statsByMonth, filter = null) {
+  const container = document.getElementById("allCharts");
+
+  const keys = Object.keys(statsByMonth).sort().reverse();
+  keys.forEach(monthKey => {
+    if (filter && monthKey !== filter) return;
+
+    const data = statsByMonth[monthKey];
+    const filtered = Object.entries(data).filter(
+      ([_, val]) => (val.done || 0) > 0 || (val.notDone || 0) > 0
+    );
+
+    const labels = filtered.map(([key]) => key);
+    const doneCounts = filtered.map(([_, val]) => val.done || 0);
+    const notDoneCounts = filtered.map(([_, val]) => val.notDone || 0);
+    const netCounts = doneCounts.map((v, i) => v - notDoneCounts[i]);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "chart-wrapper";
+
+    const title = document.createElement("h2");
+    const [year, month] = monthKey.split("-");
+    title.textContent = `${new Date(year, month - 1).toLocaleString('pl-PL', { month: 'long', year: 'numeric' })}`;
+    wrapper.appendChild(title);
+
+    const canvas = document.createElement("canvas");
+    wrapper.appendChild(canvas);
+    container.appendChild(wrapper);
+
+    renderChart(canvas, labels, doneCounts, notDoneCounts, netCounts,
+      "Zagranie: pomyślne - niepomyślne", 'rgba(76, 175, 80, 0.7)', 'rgba(76, 175, 80, 1)');
+  });
+}
+
+function applyFilter() {
+  const y = document.getElementById("yearSelect").value;
+  const m = document.getElementById("monthSelect").value;
+  const container = document.getElementById("allCharts");
+  container.innerHTML = "";
+  renderCharts(allStats, `${y}-${m}`);
+}
+
+function resetFilter() {
+  const container = document.getElementById("allCharts");
+  container.innerHTML = "";
+  renderOverallSummary(allStats);
+  renderCharts(allStats);
+}
+
+let allStats = getAllStats();
+populateFilters(allStats);
+resetFilter();
+</script>
+
+</body>
+</html>
