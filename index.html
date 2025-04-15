@@ -203,13 +203,13 @@
         const btn = document.createElement("button");
 
         if (task.done === true) {
-          btn.textContent = "Tak";
+          btn.textContent = "Take profit";
           btn.className = "done";
         } else if (task.done === false) {
-          btn.textContent = "Nie";
+          btn.textContent = "Stop loss";
           btn.className = "not-done";
         } else {
-          btn.textContent = "?";
+          btn.textContent = "Brak";
           btn.className = "";
           btn.style.backgroundColor = "#888";
           btn.style.color = "#fff";
