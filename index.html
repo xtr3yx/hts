@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
   <title>Kalendarz Miesięczny - Daily Plan</title>
   <style>
     body {
@@ -16,6 +18,10 @@
       text-align: center;
       margin-bottom: 10px;
     }
+    .no-snapshot {
+  visibility: hidden !important;
+}
+
     .controls {
       display: flex;
       justify-content: center;
@@ -106,7 +112,6 @@
       border-radius: 8px;
       text-decoration: none;
     }
-
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -180,9 +185,7 @@
 
       const header = document.createElement("div");
       header.className = "day-header";
-      header.textContent = `${day}`;
-
-
+      header.innerHTML = `${day} <button onclick="captureImage(this)" title="Zrób obrazek 🖼" style="float:left;">🖼</button>`;
       dayDiv.appendChild(header);
 
       const table = document.createElement("table");
@@ -349,6 +352,30 @@ const netCounts = filtered.map((_, i) => doneCounts[i] - notDoneCounts[i]);
 
 
   renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+  function captureImage(button) {
+  const dayDiv = button.closest('.day');
+
+  button.classList.add('no-snapshot');
+
+  html2canvas(dayDiv, {
+    backgroundColor: null,
+    scale: 2
+  }).then(canvas => {
+    button.classList.remove('no-snapshot'); 
+
+    canvas.toBlob(blob => {
+      if (navigator.clipboard && window.ClipboardItem) {
+        const item = new ClipboardItem({ "image/png": blob });
+        navigator.clipboard.write([item]).catch(err => {
+          console.warn("❌ Błąd kopiowania obrazka:", err);
+        });
+      } else {
+        console.warn("❌ Przeglądarka nie obsługuje kopiowania obrazków do schowka.");
+      }
+    });
+  });
+}
+
 
 </script>
 
