@@ -180,7 +180,8 @@
 
       const header = document.createElement("div");
       header.className = "day-header";
-      header.innerHTML = `${day} <button onclick="captureImage(this)" title="Zrób obrazek 🖼" style="float:left;">🖼</button>`;
+      header.textContent = `${day}`;
+
 
       dayDiv.appendChild(header);
 
@@ -348,29 +349,7 @@ const netCounts = filtered.map((_, i) => doneCounts[i] - notDoneCounts[i]);
 
 
   renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
-    function captureImage(button) {
-  const dayDiv = button.closest('.day');
 
-  button.classList.add('no-snapshot');
-
-  html2canvas(dayDiv, {
-    backgroundColor: null,
-    scale: 2
-  }).then(canvas => {
-    button.classList.remove('no-snapshot'); 
-
-    canvas.toBlob(blob => {
-      if (navigator.clipboard && window.ClipboardItem) {
-        const item = new ClipboardItem({ "image/png": blob });
-        navigator.clipboard.write([item]).catch(err => {
-          console.warn("❌ Błąd kopiowania obrazka:", err);
-        });
-      } else {
-        console.warn("❌ Przeglądarka nie obsługuje kopiowania obrazków do schowka.");
-      }
-    });
-  });
-}
 </script>
 
 </body>
